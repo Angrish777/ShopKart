@@ -149,6 +149,10 @@ cd backend
 # Install dependencies
 npm install
 
+# Configure environment variables
+# Copy .env.example to .env and configure MONGO_URI and JWT_SECRET
+cp .env.example .env
+
 # Seed initial product catalog
 npm run seed
 
@@ -171,6 +175,9 @@ cd frontend
 
 # Install dependencies
 npm install
+
+# Configure environment variables
+cp .env.example .env
 
 # Start the Vite development server (runs on http://localhost:5173)
 npm run dev
