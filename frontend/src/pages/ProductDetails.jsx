@@ -1,0 +1,314 @@
+import React, { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { getProductById } from "../services/api";
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+import { useWishlist } from "../context/WishlistContext";
+import {
+  ArrowLeft,
+  Tag,
+  AlertCircle,
+  CheckCircle2,
+  ShoppingCart,
+  Truck,
+  Shield,
+  RotateCcw,
+  RefreshCw,
+  Loader2,
+  Heart,
+} from "lucide-react";
+
+const ProductDetails = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addToCart, cartItems } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [addedNotice, setAddedNotice] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistNotice, setWishlistNotice] = useState("");
+  const [cartError, setCartError] = useState(null);
+
+  const isWishlisted = Boolean(product && isInWishlist(product._id));
+
+  const handleWishlistToggle = async () => {
+    if (!product || wishlistLoading) return;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setWishlistLoading(true);
+    try {
+      const res = await toggleWishlist(product._id);
+      setWishlistNotice(res.isWishlisted ? "Saved to Wishlist ♥" : "Removed from Wishlist");
+      setTimeout(() => setWishlistNotice(""), 3000);
+    } catch (err) {
+      setCartError(err.message || "Failed to update wishlist");
+      setTimeout(() => setCartError(null), 3000);
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getProductById(id);
+        const item = data.product || data;
+        setProduct(item);
+      } catch (err) {
+        setError(
+          err.response?.data?.message || "Failed to load product details."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchProduct();
+    }
+  }, [id]);
+
+  const handleAddToCart = async () => {
+    if (isOutOfStock || adding) return;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setAdding(true);
+    setCartError(null);
+    try {
+      await addToCart(product._id);
+      setAddedNotice(true);
+      setTimeout(() => setAddedNotice(false), 3000);
+    } catch (err) {
+      setCartError(err.message || "Failed to add to cart");
+      setTimeout(() => setCartError(null), 3500);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-sm font-medium text-slate-500">
+            Loading product details...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-3xl border border-rose-100 p-8 shadow-sm">
+          <div className="inline-flex w-14 h-14 rounded-2xl bg-rose-50 items-center justify-center text-rose-600 mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">
+            Product Not Found
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">
+            {error || "We couldn't retrieve the details for this product."}
+          </p>
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Catalog</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isOutOfStock = product.stock <= 0;
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Navigation Breadcrumb */}
+      <div className="mb-6">
+        <Link
+          to="/products"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Products</span>
+        </Link>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 p-6 sm:p-10">
+        {/* Large Product Image */}
+        <div className="flex flex-col">
+          <div className="relative aspect-[4/3] sm:aspect-square w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 shadow-inner">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-full object-cover object-center"
+              onError={(e) => {
+                e.target.src =
+                  "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=800&q=80";
+              }}
+            />
+            <div className="absolute top-4 left-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/90 backdrop-blur-md text-slate-800 shadow-sm">
+                <Tag className="w-3.5 h-3.5 text-blue-600" />
+                {product.category}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Product Details & Actions */}
+        <div className="flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-red-600">
+                {product.category}
+              </span>
+
+              {isOutOfStock ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Out of Stock
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {product.stock} units in stock
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-4">
+              {product.name}
+            </h1>
+
+            <div className="flex items-baseline gap-3 mb-6">
+              <span className="text-3xl font-black text-slate-900">
+                ₹{Number(product.price).toLocaleString("en-IN")}
+              </span>
+              <span className="text-xs font-medium text-slate-400">
+                inclusive of all taxes
+              </span>
+            </div>
+
+            <div className="border-t border-b border-slate-100 py-6 mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Description
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {product.description}
+              </p>
+            </div>
+
+            {/* Perks / Features */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <Truck className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <span className="text-xs font-medium text-slate-700">
+                  Fast Express Delivery
+                </span>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <Shield className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <span className="text-xs font-medium text-slate-700">
+                  1-Year Warranty
+                </span>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <RotateCcw className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <span className="text-xs font-medium text-slate-700">
+                  30-Day Returns
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions Section: Add to Cart + Add to Wishlist */}
+          <div className="pt-4 space-y-3">
+            {addedNotice && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Added to your cart successfully!</span>
+              </div>
+            )}
+
+            {wishlistNotice && (
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2 animate-in">
+                <Heart className="w-4 h-4 fill-red-500 text-red-500 flex-shrink-0" />
+                <span>{wishlistNotice}</span>
+              </div>
+            )}
+
+            {cartError && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>{cartError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleAddToCart}
+                disabled={isOutOfStock || adding}
+                className="flex-1 py-4 px-6 rounded-full bg-red-600 hover:bg-red-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all cursor-pointer"
+              >
+                {adding ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Adding to Cart...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-5 h-5" />
+                    <span>
+                      {isOutOfStock
+                        ? "Sold Out"
+                        : cartItems.some((item) => (item.product?._id || item.product) === product?._id)
+                        ? `Add Another (${cartItems.find((item) => (item.product?._id || item.product) === product?._id)?.quantity} in cart)`
+                        : "Add to Cart"}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleWishlistToggle}
+                disabled={wishlistLoading}
+                className={`py-4 px-6 rounded-full border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  isWishlisted
+                    ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100 shadow-sm"
+                    : "bg-white border-slate-200 text-slate-700 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"
+                } ${wishlistLoading ? "opacity-70 cursor-wait" : ""}`}
+                title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
+              >
+                {wishlistLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                ) : (
+                  <Heart className={`w-4 h-4 transition-all ${isWishlisted ? "fill-red-500 text-red-500 scale-110" : "text-slate-400"}`} />
+                )}
+                <span>{isWishlisted ? "Saved to Wishlist" : "Save to Wishlist"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductDetails;
